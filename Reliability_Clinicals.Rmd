@@ -1,0 +1,234 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+r <- getOption("repos")
+r["CRAN"] <- "http://cran.cnr.berkeley.edu/"
+options(repos = r)
+```
+
+```{r Libraries}
+library(tidyverse)
+library(MASS)
+library(survival)
+library(labelled)
+library(GGally)
+library(lattice)
+library(ranger)
+library(ggplot2)
+library(dplyr)
+library(ggfortify)
+library(dynpred)
+```
+
+```{r Data Exploration}
+VA.df <- VA
+VA.df <- VA.df[order(VA.df$stime),]
+
+hist(VA.df[VA.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Full Dataset")
+
+# Right-skewed
+
+# Continuous variables include survival time, age, Karnofsky score, and diagnosis time. 
+
+# Categorical variables are subsetted below.
+
+# Status
+failed.df <- subset(VA.df, status == 1)
+censored.df <- subset(VA.df, status == 0)
+
+# Cell Type
+squamous.df <- subset(VA.df, cell == 1)
+
+hist(squamous.df[squamous.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Squamous Cell Dataset")
+
+# Right-skewed
+
+small_cell.df <- subset(VA.df, cell == 2)
+
+hist(small_cell.df[small_cell.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Small Cell Dataset")
+
+# Right-skewed
+
+adeno.df <- subset(VA.df, cell == 3)
+
+hist(adeno.df[adeno.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Adeno Cell Dataset")
+
+# Right-skewed
+
+large_cell.df <- subset(VA.df, cell == 4)
+
+hist(large_cell.df[large_cell.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Large Cell Dataset")
+
+# Right-skewed / Normal
+
+# Treatment
+test.df <- subset(VA.df, treat == 2)
+
+hist(test.df[test.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Test Dataset")
+
+# Right-skewed 
+
+standard.df <- subset(VA.df, treat == 1)
+
+hist(standard.df[standard.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Standard Dataset")
+
+# Right-skewed 
+
+# Prior Therapy
+therapy.df <- subset(VA.df, prior == 10)
+
+hist(therapy.df[therapy.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of Prior Therapy Patient Dataset")
+
+# Right-skewed
+
+no_therapy.df <- subset(VA.df, prior == 0)
+
+hist(no_therapy.df[no_therapy.df$status == 1, "stime"], main="", col = "lightgrey", xlab = "Time")
+title("Histogram of No Prior Therapy Patient Dataset")
+
+# Right-skewed
+```
+
+```{r Correlation Plots}
+# Full Dataset
+VA_quant.df <- subset(VA.df, select=c(stime, age, Karn, diag.time))
+VA_quant_plot <- ggcorr(VA_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Full Dataset")
+
+# Status
+failed_quant.df <- subset(failed.df, select=c(stime, age, Karn, diag.time))
+failed_quant_plot <- ggcorr(failed_quant.df, label = TRUE) + 
+  ggplot2::labs(title = "Failed Dataset")
+
+censored_quant.df <- subset(censored.df, select=c(stime, age, Karn, diag.time))
+censored_quant_plot <- ggcorr(censored_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Censored Dataset")
+
+# Cell Type
+squamous_quant.df <- subset(squamous.df, select=c(stime, age, Karn, diag.time))
+squamous_quant_plot <- ggcorr(squamous_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Squamous Cell Dataset")
+
+small_cell_quant.df <- subset(small_cell.df, select=c(stime, age, Karn, diag.time))
+small_cell_quant_plot <- ggcorr(small_cell_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Small Cell Dataset")
+
+adeno_quant.df <- subset(adeno.df, select=c(stime, age, Karn, diag.time))
+adeno_quant_plot <- ggcorr(adeno_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Adeno Cell Dataset")
+
+large_cell_quant.df <- subset(large_cell.df, select=c(stime, age, Karn, diag.time))
+large_cell_quant_plot <- ggcorr(large_cell_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Large Cell Dataset")
+
+# Treatment
+test_quant.df <- subset(test.df, select=c(stime, age, Karn, diag.time))
+test_quant_plot <- ggcorr(test_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Test Dataset")
+
+standard_quant.df <- subset(standard.df, select=c(stime, age, Karn, diag.time))
+standard_quant_plot <- ggcorr(standard_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Standard Dataset")
+
+# Prior Therapy
+therapy_quant.df <- subset(therapy.df, select=c(stime, age, Karn, diag.time))
+therapy_quant_plot <- ggcorr(therapy_quant.df, label = TRUE) +
+  ggplot2::labs(title = "Prior Therapy Patient Dataset")
+
+no_therapy_quant.df <- subset(no_therapy.df, select=c(stime, age, Karn, diag.time))
+no_therapy_quant_plot <- ggcorr(no_therapy_quant.df, label = TRUE) +
+  ggplot2::labs(title = "No Prior Therapy Patient Dataset")
+
+par(mfrow=c(3,4))
+VA_quant_plot
+failed_quant_plot
+censored_quant_plot
+squamous_quant_plot
+small_cell_quant_plot
+adeno_quant_plot
+large_cell_quant_plot
+test_quant_plot
+standard_quant_plot
+therapy_quant_plot
+no_therapy_quant_plot
+```
+
+```{r K-M Reliability Estimates}
+# Full Dataset
+km_full <- survfit(Surv(stime, status) ~ 1, data=VA.df)
+autoplot(km_full, main = "Full Dataset K-M")
+
+# cindex(Surv(stime, status) ~ treat + age + Karn + diag.time + cell + prior, data = VA.df)
+
+# Cell Type
+km_cell <- survfit(Surv(stime, status) ~ cell, data=VA.df)
+autoplot(km_cell, main = "Cell Type Comparison K-M")
+
+# Those who had squamous cell lung cancer had longer survival times followed by large cell, small cell, and adeno cell.
+
+# Treatment
+km_treatment <- survfit(Surv(stime, status) ~ treat, data=VA.df)
+autoplot(km_treatment, main = "Treatment Type Comparison K-M")
+
+# Those who received treatment had longer survival times.
+
+# Prior Therapy
+km_prior <- survfit(Surv(stime, status) ~ prior, data=VA.df)
+autoplot(km_prior, main = "Prior Therapy Comparison K-M")
+
+# Those with prior treatment had longer survival times.
+
+# Age
+# With elderly defined as 65 and older, the data was subsetted by this boundary.
+VA_age.df <- VA.df %>% mutate(ifelse((age<=65), 1, 0))
+names(VA_age.df)[9] <- "age_new"
+VA_age.df$age_new <- as.factor(VA_age.df$age_new)
+km_age <- survfit(Surv(stime, status) ~ age_new, data=VA_age.df)
+autoplot(km_age, main = "Age Comparison K-M")
+
+# Those who were younger had longer survival times.
+
+# Karn Score
+# Split 50/50.
+VA_karn.df <- VA.df %>% mutate(ifelse((Karn<=40), 1, 0))
+names(VA_karn.df)[9] <- "karn_score"
+VA_karn.df$karn_score <- as.factor(VA_karn.df$karn)
+km_karn <- survfit(Surv(stime, status) ~ karn_score, data=VA_karn.df)
+autoplot(km_karn, main = "Karnofsky Score Comparison K-M") 
+
+# Those who had a higher Karnofsky score had longer survival times.
+# Score of less than 40 indicates unable to care for self.
+```
+
+```{r Cox Proportional Hazards Model}
+cox_model <- coxph(Surv(stime, status) ~ treat + age + Karn + diag.time + cell + prior, data = VA.df)
+summary(cox_model)
+
+# Karn, cell2 (small cell), and cell3 (adeno cell) are noted as significant within the summary.
+
+cox_full <- survfit(cox_model)
+autoplot(cox_full, main = "Cox Proportional Hazards Model")
+
+# Note, this model is limited as it assumes the variables are not time-dependent. This assumption is broken in this model.
+
+autoplot(aareg(Surv(stime, status) ~ treat + age + Karn + diag.time + cell + prior, data = VA.df))
+
+# These charts depict the time dependence of the variables.
+
+# For comparative purposes, the C-index is calculated.
+
+# cindex()
+```
+
+```{r, Save}
+# Save the Environment
+save(list=ls(all=T),file='Reliability_Clinicals')
+```

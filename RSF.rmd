@@ -1,0 +1,115 @@
+---
+title: "RSF"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+
+```
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+
+```{r}
+plot.survival(rfsrc(Surv(time, status)~ ., veteran), cens.model = "rfsrc")
+
+```
+
+```{r}
+data(veteran, package = "randomForestSRC")
+v.obj <- rfsrc(Surv(time,status)~., veteran, ntree = 100)
+plot.variable(v.obj, plots.per.page = 3)
+plot.variable(v.obj, plots.per.page = 2, xvar.names = c("trt", "karno", "age"))
+plot.variable(v.obj, surv.type = "surv", nvar = 1, time = 200)
+plot.variable(v.obj, surv.type = "surv", partial = TRUE, smooth.lines = TRUE)
+plot.variable(v.obj, surv.type = "rel.freq", partial = TRUE, nvar = 2)
+```
+
+```{r}
+yvar <- v.obj$yvar
+```
+
+```{r}
+# fit a mixed outcome forest using days and status as y-variables
+vet.mod <- veteran
+vet.mod$status <- factor(vet.mod$status)
+mix.obj <- rfsrc(Multivar(time, status) ~., vet.mod)
+```
+
+```{r}
+# compare oob predicted values
+v.pred <- v.obj$predicted.oob
+mix.pred <- mix.obj$regrOutput$time$predicted.oob
+plot(v.pred, mix.pred)
+
+```
+
+```{r}
+mix.pred
+```
+
+```{r}
+# compare C-index error rate
+rsf.err <- randomForestSRC:::cindex(yvar$time, yvar$status, v.pred)
+mix.err <- 1 - randomForestSRC:::cindex(yvar$time, yvar$status, mix.pred)
+cat("RSF                :", rsf.err, "\n")
+cat("multivariate forest:", mix.err, "\n")
+```
+
+```{r}
+train <- sample(1:nrow(veteran), round(nrow(veteran) * 0.80))
+# Train the model.
+veteran.grow <- rfsrc(Surv(time, status) ~ ., veteran[train, ], ntree = 100)
+# Test the model.
+veteran.pred <- predict(veteran.grow, veteran[-train , ])
+# Compare the results.
+print(veteran.grow)
+print(veteran.pred)
+```
+```{r}
+
+```
+
+```{r}
+plot.variable(v.obj, partial = TRUE)
+```
+
+```{r}
+data(veteran, package = "randomForestSRC")
+veteran.factor <- data.frame(lapply(veteran, factor))
+veteran.factor$time <- veteran$time
+veteran.factor$status <- veteran$status
+# split the data into unbalanced train/test data (5/95)
+# the train/test data have the same levels, but different labels
+train <- sample(1:nrow(veteran), round(nrow(veteran) * .05))
+summary(veteran.factor[train,])
+summary(veteran.factor[-train,])
+# grow the forest on the training data and predict on the test data
+veteran.f.grow <- rfsrc(Surv(time, status) ~ ., veteran.factor[train, ])
+veteran.f.pred <- predict(veteran.f.grow, veteran.factor[-train , ])
+print(veteran.f.grow)
+print(veteran.f.pred)
+```
+
+```{r}
+v.obj <- rfsrc(Surv(time, status) ~ ., data = veteran,
+ntree = 100, block.size = 1)
+## print and plot the grow object
+print(v.obj)
+plot(v.obj)
+## plot survival curves for first 10 individuals -- direct way
+matplot(v.obj$time.interest, 100 * t(v.obj$survival.oob[1:10, ]),
+xlab = "Time", ylab = "Survival", type = "l", lty = 1)
+## plot survival curves for first 10 individuals -- use wrapper
+plot.survival(v.obj, subset = 1:10)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
